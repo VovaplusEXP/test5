@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+    <title>Quiz Task Pane</title>
+    <script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            padding: 10px;
+            background-color: #f3f2f1;
+        }
+        #quiz-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+            gap: 5px;
+        }
+        .category-header {
+            grid-column: 1 / -1;
+            text-align: center;
+            background-color: #0078d4;
+            color: white;
+            padding: 8px;
+            font-weight: bold;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .question-cell {
+            background-color: #fff;
+            border: 1px solid #ccc;
+            padding: 15px;
+            text-align: center;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: background-color 0.2s, transform 0.2s;
+        }
+        .question-cell:hover {
+            background-color: #e1dfdd;
+            transform: scale(1.05);
+        }
+        .question-cell.disabled {
+            background-color: #e1dfdd;
+            color: #a19f9d;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        #loading {
+            text-align: center;
+            padding: 20px;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Загрузка вопросов...</div>
+    <div id="quiz-container"></div>
+
+    <script type="text/javascript" src="taskpane.js"></script>
+</body>
+</html>
