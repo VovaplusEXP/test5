@@ -15,63 +15,71 @@
         #question-view { display: none; }
 
         #score-display {
-            text-align: center;
-            font-size: 1.2em;
-            font-weight: bold;
-            margin-bottom: 10px;
-            background-color: #0078d4;
-            color: white;
-            padding: 5px;
-            border-radius: 4px;
+            text-align: center; font-size: 1.2em; font-weight: bold; margin-bottom: 10px;
+            background-color: #0078d4; color: white; padding: 5px; border-radius: 4px;
         }
 
-        #quiz-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-            gap: 5px;
+        /* Стили для таблицы */
+        #quiz-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
         }
-        .category-header {
-            grid-column: 1 / -1; text-align: center; background-color: #0078d4;
-            color: white; padding: 8px; font-weight: bold; border-radius: 4px; margin-top: 10px;
+        #quiz-table th, #quiz-table td {
+            border: 1px solid #ccc;
+            padding: 8px;
+            text-align: center;
+        }
+        #quiz-table th {
+            background-color: #0078d4;
+            color: white;
+            font-weight: bold;
+        }
+        .category-name-cell {
+            background-color: #4a4a4a;
+            color: white;
+            font-weight: bold;
+            text-align: left;
         }
         .question-cell {
-            background-color: #fff; border: 1px solid #ccc; padding: 15px; text-align: center;
-            font-size: 1.2em; font-weight: bold; cursor: pointer; border-radius: 4px;
-            transition: background-color 0.2s, transform 0.2s;
+            background-color: #fff;
+            font-size: 1.2em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
-        .question-cell:hover { background-color: #e1dfdd; transform: scale(1.05); }
+        .question-cell:hover { background-color: #e1dfdd; }
         .question-cell.disabled {
             background-color: #e1dfdd; color: #a19f9d; cursor: not-allowed; pointer-events: none;
+        }
+        .question-cell.locked {
+            background-color: #f3f2f1; border-color: #d1d1d1; color: #b1b1b1;
+            cursor: not-allowed; pointer-events: none;
+        }
+        .placeholder-cell {
+            background-color: #f3f2f1;
+            border-color: #d1d1d1;
         }
         
         #question-text { font-size: 1.1em; margin-bottom: 15px; }
         .answer-btn {
             display: block; width: 100%; padding: 10px; margin-bottom: 8px; text-align: left;
             background-color: #fff; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;
-            transition: background-color 0.3s;
         }
-        .answer-btn:hover { background-color: #e1dfdd; }
         .answer-btn.correct { background-color: #92c353; color: white; }
         .answer-btn.incorrect { background-color: #d13438; color: white; }
 
-        #hint-container {
-            display: none; /* Скрыт по умолчанию */
-            margin-top: 15px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeeba; border-radius: 4px;
-        }
+        #hint-container { display: none; margin-top: 15px; padding: 10px; background-color: #fff3cd; border: 1px solid #ffeeba; }
         #controls { margin-top: 20px; display: flex; justify-content: space-between; }
         #loading { text-align: center; padding: 20px; font-size: 1.2em; }
     </style>
 </head>
 <body>
     <div id="loading">Загрузка вопросов...</div>
-
-    <!-- ЭКРАН 1: СЕТКА С ВОПРОСАМИ -->
     <div id="quiz-grid-view">
         <div id="score-display">Счет: 0</div>
-        <div id="quiz-container"></div>
+        <table id="quiz-table"></table>
     </div>
-
-    <!-- ЭКРАН 2: ВОПРОС И ВАРИАНТЫ ОТВЕТА -->
     <div id="question-view">
         <h3 id="question-category"></h3>
         <p id="question-text"></p>
@@ -84,7 +92,6 @@
             <button id="back-to-grid">Назад к таблице</button>
         </div>
     </div>
-
     <script type="text/javascript" src="taskpane.js"></script>
 </body>
 </html>
