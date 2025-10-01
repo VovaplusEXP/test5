@@ -1,16 +1,14 @@
 'use strict';
 
-// URL вашего веб-приложения Google Apps Script
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyTkziw2S7sA6i-3FX0bOZjpi2cLT1iSoN9-3BgWV0JdeFi1RSMyJQbdpWAH8BMD_OWpg/exec"; // <-- НЕ ЗАБУДЬТЕ ВСТАВИТЬ СВОЙ URL
 
-// Получаем ссылки на DOM-элементы
 const gridView = document.getElementById('quiz-grid-view');
 const questionView = document.getElementById('question-view');
 const loadingIndicator = document.getElementById('loading');
 const scoreDisplay = document.getElementById('score-display');
 
 let score = 0;
-let currentQuestionCell = null; // Сохраняем ячейку текущего вопроса
+let currentQuestionCell = null;
 
 Office.onReady(info => {
     if (info.host === Office.HostType.PowerPoint) {
@@ -26,7 +24,7 @@ async function fetchQuizData() {
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
         if (result.status === "success") {
-            buildQuizGrid(result.data);
+            buildQuizTable(result.data);
         } else {
             throw new Error(result.message || "Ошибка при получении данных.");
         }
@@ -36,38 +34,66 @@ async function fetchQuizData() {
     }
 }
 
-function buildQuizGrid(data) {
-    const container = document.getElementById("quiz-container");
-    container.innerHTML = "";
+function buildQuizTable(data) {
+    const table = document.getElementById("quiz-table");
+    table.innerHTML = "";
     loadingIndicator.style.display = "none";
 
+    // 1. Собрать все уникальные значения баллов для заголовка
+    const pointValues = [...new Set(Object.values(data).flat().map(q => q.points))].sort((a, b) => a - b);
+
+    // 2. Создать заголовок таблицы (thead)
+    const thead = table.createTHead();
+    const headerRow = thead.insertRow();
+    headerRow.insertCell().textContent = "Категория"; // Пустая ячейка для названий категорий
+    pointValues.forEach(points => {
+        const th = document.createElement('th');
+        th.textContent = points;
+        headerRow.appendChild(th);
+    });
+
+    // 3. Создать тело таблицы (tbody)
+    const tbody = table.createTBody();
     for (const category in data) {
         if (data.hasOwnProperty(category)) {
-            const header = document.createElement("div");
-            header.className = "category-header";
-            header.textContent = category;
-            container.appendChild(header);
+            const row = tbody.insertRow();
+            row.insertCell().textContent = category;
+            row.cells[0].className = 'category-name-cell';
 
-            const questions = data[category];
-            questions.forEach(q => {
-                const cell = document.createElement("div");
-                cell.className = "question-cell";
-                cell.textContent = q.points;
-                cell.dataset.category = category;
-                cell.dataset.question = q.question;
-                cell.dataset.answers = JSON.stringify(q.answers);
-                cell.dataset.correctAnswerIndex = q.correctAnswerIndex;
-                cell.dataset.hint = q.hint;
-                cell.dataset.points = q.points;
-                cell.onclick = () => handleQuestionClick(cell);
-                container.appendChild(cell);
+            let isFirstQuestionInRow = true;
+            const questionsInCategory = data[category];
+
+            pointValues.forEach(points => {
+                const cell = row.insertCell();
+                const question = questionsInCategory.find(q => q.points === points);
+
+                if (question) {
+                    cell.textContent = question.points;
+                    cell.className = 'question-cell';
+                    cell.dataset.category = category;
+                    cell.dataset.question = question.question;
+                    cell.dataset.answers = JSON.stringify(question.answers);
+                    cell.dataset.correctAnswerIndex = question.correctAnswerIndex;
+                    cell.dataset.hint = question.hint;
+                    cell.dataset.points = question.points;
+                    cell.onclick = () => handleQuestionClick(cell);
+
+                    // Логика "лесенки"
+                    if (isFirstQuestionInRow) {
+                        isFirstQuestionInRow = false;
+                    } else {
+                        cell.classList.add('locked');
+                    }
+                } else {
+                    cell.className = 'placeholder-cell'; // Пустая ячейка, если вопроса с такими баллами нет
+                }
             });
         }
     }
 }
 
 function handleQuestionClick(cell) {
-    currentQuestionCell = cell; // Сохраняем текущую ячейку
+    currentQuestionCell = cell;
     const { category, question, answers: answersJson, hint } = cell.dataset;
     const answers = JSON.parse(answersJson);
 
@@ -76,7 +102,6 @@ function handleQuestionClick(cell) {
     
     const answersContainer = document.getElementById('answers-container');
     answersContainer.innerHTML = '';
-    
     answers.forEach((answer, index) => {
         const button = document.createElement('button');
         button.className = 'answer-btn';
@@ -85,22 +110,19 @@ function handleQuestionClick(cell) {
         answersContainer.appendChild(button);
     });
 
-    // Логика подсказки
     const hintContainer = document.getElementById('hint-container');
-    const hintText = document.getElementById('hint-text');
     const showHintBtn = document.getElementById('show-hint-btn');
-    
     if (hint) {
-        hintText.textContent = hint;
+        document.getElementById('hint-text').textContent = hint;
         showHintBtn.style.display = 'block';
         showHintBtn.onclick = () => {
             hintContainer.style.display = 'block';
-            showHintBtn.style.display = 'none'; // Скрываем кнопку после использования
+            showHintBtn.style.display = 'none';
         };
     } else {
         showHintBtn.style.display = 'none';
     }
-    hintContainer.style.display = 'none'; // Скрываем подсказку при показе нового вопроса
+    hintContainer.style.display = 'none';
 
     showQuestionView();
 }
@@ -110,27 +132,28 @@ function checkAnswer(selectedIndex) {
     const points = parseInt(currentQuestionCell.dataset.points, 10);
     const answerButtons = document.querySelectorAll('#answers-container .answer-btn');
 
-    // Блокируем все кнопки
     answerButtons.forEach(btn => btn.disabled = true);
 
     if (selectedIndex === correctIndex) {
-        // Правильный ответ
         answerButtons[selectedIndex].classList.add('correct');
         score += points;
         updateScore();
     } else {
-        // Неправильный ответ
         answerButtons[selectedIndex].classList.add('incorrect');
-        if (correctIndex > -1) {
-            // Подсвечиваем правильный, если он есть
-            answerButtons[correctIndex].classList.add('correct');
-        }
+        if (correctIndex > -1) answerButtons[correctIndex].classList.add('correct');
     }
 
-    // Отключаем ячейку вопроса в сетке
     currentQuestionCell.classList.add("disabled");
 
-    // Возвращаемся к сетке через 2.5 секунды
+    // Разблокируем следующую ячейку в строке
+    let nextCell = currentQuestionCell.nextElementSibling;
+    while(nextCell && !nextCell.classList.contains('question-cell')) {
+        nextCell = nextCell.nextElementSibling; // Пропускаем пустые ячейки
+    }
+    if (nextCell) {
+        nextCell.classList.remove('locked');
+    }
+
     setTimeout(showGridView, 2500);
 }
 
