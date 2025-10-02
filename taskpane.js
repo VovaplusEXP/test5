@@ -18,7 +18,6 @@ Office.onReady(info => {
 
 async function fetchQuizData() {
     try {
-        // ИЗМЕНЕНИЕ: Добавляем параметр action=getQuizData к URL
         const response = await fetch(`${SCRIPT_URL}?action=getQuizData`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
@@ -33,7 +32,6 @@ async function fetchQuizData() {
     }
 }
 
-// Функция buildQuizTable остается без изменений
 function buildQuizTable(data) {
     const table = document.getElementById("quiz-table");
     table.innerHTML = "";
@@ -85,17 +83,13 @@ function handleQuestionClick(cell) {
     currentQuestionCell = cell;
     const { category, question, answers: answersJson, hint, points } = cell.dataset;
     const answers = JSON.parse(answersJson);
-
-    // Активируем вопрос для игроков
     const questionDataForPlayers = {
         category,
         question,
-        points,
-        answers: answers.map((ans, index) => String.fromCharCode(65 + index)) // Отправляем только буквы A, B, C...
+        points: parseInt(points, 10),
+        answers: answers.map((ans, index) => String.fromCharCode(65 + index))
     };
     postToServer({ action: 'setActiveQuestion', data: questionDataForPlayers });
-
-    // Отображаем вопрос для ведущего
     document.getElementById('question-category').textContent = `${category} за ${points}`;
     document.getElementById('question-text').textContent = question;
     const answersContainer = document.getElementById('answers-container');
@@ -141,11 +135,9 @@ function checkAnswer(selectedIndex) {
     if (nextCell) {
         nextCell.classList.remove('locked');
     }
-    // Убрали авто-возврат, теперь ведущий нажимает кнопку "Назад" сам
 }
 
 function showGridView() {
-    // Сбрасываем активный вопрос для игроков
     postToServer({ action: 'setActiveQuestion', data: null });
     questionView.style.display = 'none';
     gridView.style.display = 'block';
@@ -156,19 +148,25 @@ function showQuestionView() {
     questionView.style.display = 'block';
 }
 
-// Новая универсальная функция для отправки POST-запросов на сервер
 async function postToServer(payload) {
+    console.log("Отправка на сервер:", JSON.stringify(payload));
     try {
-        await fetch(SCRIPT_URL, {
+        const response = await fetch(SCRIPT_URL, {
             method: 'POST',
-            mode: 'no-cors', // Важно для отправки данных в Google Apps Script из надстройки
+            // УБИРАЕМ no-cors для отладки
+            // mode: 'no-cors', 
             cache: 'no-cache',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'text/plain;charset=utf-8', // Меняем заголовок для обхода preflight
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            redirect: 'follow' // Добавляем, чтобы следовать за редиректами Google
         });
+        // Если мы дошли сюда без no-cors, нам нужно прочитать ответ
+        const result = await response.json();
+        console.log("Ответ от сервера:", result);
     } catch (error) {
-        console.error('Ошибка при отправке данных на сервер:', error);
+        // Вот здесь мы увидим ошибку CORS, если она есть
+        console.error('ОШИБКА при отправке данных на сервер:', error);
     }
 }
