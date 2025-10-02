@@ -5,9 +5,7 @@ const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyTkziw2S7sA6i-3FX0b
 const gridView = document.getElementById('quiz-grid-view');
 const questionView = document.getElementById('question-view');
 const loadingIndicator = document.getElementById('loading');
-const scoreDisplay = document.getElementById('score-display');
 
-let score = 0;
 let currentQuestionCell = null;
 
 Office.onReady(info => {
@@ -20,7 +18,8 @@ Office.onReady(info => {
 
 async function fetchQuizData() {
     try {
-        const response = await fetch(SCRIPT_URL);
+        // ИЗМЕНЕНИЕ: Добавляем параметр action=getQuizData к URL
+        const response = await fetch(`${SCRIPT_URL}?action=getQuizData`);
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
         const result = await response.json();
         if (result.status === "success") {
@@ -34,39 +33,31 @@ async function fetchQuizData() {
     }
 }
 
+// Функция buildQuizTable остается без изменений
 function buildQuizTable(data) {
     const table = document.getElementById("quiz-table");
     table.innerHTML = "";
     loadingIndicator.style.display = "none";
-
-    // 1. Собрать все уникальные значения баллов для заголовка
     const pointValues = [...new Set(Object.values(data).flat().map(q => q.points))].sort((a, b) => a - b);
-
-    // 2. Создать заголовок таблицы (thead)
     const thead = table.createTHead();
     const headerRow = thead.insertRow();
-    headerRow.insertCell().textContent = "Категория"; // Пустая ячейка для названий категорий
+    headerRow.insertCell().textContent = "Категория";
     pointValues.forEach(points => {
         const th = document.createElement('th');
         th.textContent = points;
         headerRow.appendChild(th);
     });
-
-    // 3. Создать тело таблицы (tbody)
     const tbody = table.createTBody();
     for (const category in data) {
         if (data.hasOwnProperty(category)) {
             const row = tbody.insertRow();
             row.insertCell().textContent = category;
             row.cells[0].className = 'category-name-cell';
-
             let isFirstQuestionInRow = true;
             const questionsInCategory = data[category];
-
             pointValues.forEach(points => {
                 const cell = row.insertCell();
                 const question = questionsInCategory.find(q => q.points === points);
-
                 if (question) {
                     cell.textContent = question.points;
                     cell.className = 'question-cell';
@@ -77,15 +68,13 @@ function buildQuizTable(data) {
                     cell.dataset.hint = question.hint;
                     cell.dataset.points = question.points;
                     cell.onclick = () => handleQuestionClick(cell);
-
-                    // Логика "лесенки"
                     if (isFirstQuestionInRow) {
                         isFirstQuestionInRow = false;
                     } else {
                         cell.classList.add('locked');
                     }
                 } else {
-                    cell.className = 'placeholder-cell'; // Пустая ячейка, если вопроса с такими баллами нет
+                    cell.className = 'placeholder-cell';
                 }
             });
         }
@@ -94,12 +83,21 @@ function buildQuizTable(data) {
 
 function handleQuestionClick(cell) {
     currentQuestionCell = cell;
-    const { category, question, answers: answersJson, hint } = cell.dataset;
+    const { category, question, answers: answersJson, hint, points } = cell.dataset;
     const answers = JSON.parse(answersJson);
 
-    document.getElementById('question-category').textContent = `${category} за ${cell.textContent}`;
+    // Активируем вопрос для игроков
+    const questionDataForPlayers = {
+        category,
+        question,
+        points,
+        answers: answers.map((ans, index) => String.fromCharCode(65 + index)) // Отправляем только буквы A, B, C...
+    };
+    postToServer({ action: 'setActiveQuestion', data: questionDataForPlayers });
+
+    // Отображаем вопрос для ведущего
+    document.getElementById('question-category').textContent = `${category} за ${points}`;
     document.getElementById('question-text').textContent = question;
-    
     const answersContainer = document.getElementById('answers-container');
     answersContainer.innerHTML = '';
     answers.forEach((answer, index) => {
@@ -109,7 +107,6 @@ function handleQuestionClick(cell) {
         button.onclick = () => checkAnswer(index);
         answersContainer.appendChild(button);
     });
-
     const hintContainer = document.getElementById('hint-container');
     const showHintBtn = document.getElementById('show-hint-btn');
     if (hint) {
@@ -123,45 +120,33 @@ function handleQuestionClick(cell) {
         showHintBtn.style.display = 'none';
     }
     hintContainer.style.display = 'none';
-
     showQuestionView();
 }
 
 function checkAnswer(selectedIndex) {
     const correctIndex = parseInt(currentQuestionCell.dataset.correctAnswerIndex, 10);
-    const points = parseInt(currentQuestionCell.dataset.points, 10);
     const answerButtons = document.querySelectorAll('#answers-container .answer-btn');
-
     answerButtons.forEach(btn => btn.disabled = true);
-
     if (selectedIndex === correctIndex) {
         answerButtons[selectedIndex].classList.add('correct');
-        score += points;
-        updateScore();
     } else {
         answerButtons[selectedIndex].classList.add('incorrect');
         if (correctIndex > -1) answerButtons[correctIndex].classList.add('correct');
     }
-
     currentQuestionCell.classList.add("disabled");
-
-    // Разблокируем следующую ячейку в строке
     let nextCell = currentQuestionCell.nextElementSibling;
     while(nextCell && !nextCell.classList.contains('question-cell')) {
-        nextCell = nextCell.nextElementSibling; // Пропускаем пустые ячейки
+        nextCell = nextCell.nextElementSibling;
     }
     if (nextCell) {
         nextCell.classList.remove('locked');
     }
-
-    setTimeout(showGridView, 2500);
-}
-
-function updateScore() {
-    scoreDisplay.textContent = `Счет: ${score}`;
+    // Убрали авто-возврат, теперь ведущий нажимает кнопку "Назад" сам
 }
 
 function showGridView() {
+    // Сбрасываем активный вопрос для игроков
+    postToServer({ action: 'setActiveQuestion', data: null });
     questionView.style.display = 'none';
     gridView.style.display = 'block';
 }
@@ -169,4 +154,21 @@ function showGridView() {
 function showQuestionView() {
     gridView.style.display = 'none';
     questionView.style.display = 'block';
+}
+
+// Новая универсальная функция для отправки POST-запросов на сервер
+async function postToServer(payload) {
+    try {
+        await fetch(SCRIPT_URL, {
+            method: 'POST',
+            mode: 'no-cors', // Важно для отправки данных в Google Apps Script из надстройки
+            cache: 'no-cache',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+    } catch (error) {
+        console.error('Ошибка при отправке данных на сервер:', error);
+    }
 }
